@@ -91,14 +91,39 @@ func (s *Service) GetPackage(id string) (PackageView, error) {
 		return PackageView{}, err
 	}
 	view := makeView(aggregate)
+	// 时间线缓存复用同一版本的计算结果，但缓存中的条目是不可变快照：
+	// 返回给调用方前必须深拷贝，避免外部修改 TimelineItem.Actor 或
+	// Details 后污染缓存、并在并发读取之间产生数据竞争。
+	var canonical []audit.TimelineItem
 	s.timelineMu.Lock()
 	if cached, ok := s.timelineCache[id]; ok && cached.version == aggregate.Package.Version {
-		view.Timeline = cached.items
+		canonical = cached.items
 	} else {
-		s.timelineCache[id] = cachedTimeline{version: aggregate.Package.Version, items: view.Timeline}
+		canonical = view.Timeline
+		s.timelineCache[id] = cachedTimeline{version: aggregate.Package.Version, items: canonical}
 	}
 	s.timelineMu.Unlock()
+	view.Timeline = cloneTimeline(canonical)
 	return view, nil
+}
+
+// cloneTimeline 返回时间线条目的独立深拷贝。缓存复用同一版本的计算结果，
+// 但调用方可以自由修改返回的 TimelineItem（包括 Actor 与 Details），
+// 因此每次返回都必须与缓存及并发的其它读取完全隔离。
+func cloneTimeline(items []audit.TimelineItem) []audit.TimelineItem {
+	copied := make([]audit.TimelineItem, len(items))
+	for i := range items {
+		entry := items[i]
+		if entry.Details != nil {
+			details := make(map[string]any, len(entry.Details))
+			for key, value := range entry.Details {
+				details[key] = value
+			}
+			entry.Details = details
+		}
+		copied[i] = entry
+	}
+	return copied
 }
 
 func (s *Service) ListPackages() ([]PackageSummary, error) {
