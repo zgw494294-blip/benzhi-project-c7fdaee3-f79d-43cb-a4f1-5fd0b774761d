@@ -69,5 +69,6 @@ func writeSnapshot(path string, value snapshot) error {
 		return err
 	}
 	defer dir.Close()
-	return dir.Sync()
+	_ = dir.Sync()
+	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -175,7 +176,24 @@ func (r *Repository) Commit(request CommitRequest) (json.RawMessage, bool, error
 		return nil, false, err
 	}
 	frame.Checksum = checksum
+	offset, err := r.logFile.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, false, err
+	}
 	if err := appendFrame(r.logFile, frame); err != nil {
+		return nil, false, err
+	}
+	packages, err := cloneMap(r.state.Packages)
+	if err != nil {
+		r.rollbackLog(offset)
+		return nil, false, err
+	}
+	packages[request.PackageID] = current
+	idempotency := cloneIdempotency(r.state.Idempotency)
+	idempotency[index] = record
+	copyState := snapshot{SchemaVersion: schemaVersion, LastSequence: frame.Sequence, LastHash: frame.Checksum, NextSerial: nextSerial, Packages: packages, Idempotency: idempotency}
+	if err := writeSnapshot(r.snapshotPath, copyState); err != nil {
+		r.rollbackLog(offset)
 		return nil, false, err
 	}
 	r.state.Packages[request.PackageID] = current
@@ -183,13 +201,11 @@ func (r *Repository) Commit(request CommitRequest) (json.RawMessage, bool, error
 	r.state.NextSerial = nextSerial
 	r.state.LastSequence = frame.Sequence
 	r.state.LastHash = frame.Checksum
-	packages, err := cloneMap(r.state.Packages)
-	if err != nil {
-		return nil, false, err
-	}
-	copyState := snapshot{SchemaVersion: schemaVersion, LastSequence: r.state.LastSequence, LastHash: r.state.LastHash, NextSerial: r.state.NextSerial, Packages: packages, Idempotency: r.state.Idempotency}
-	if err := writeSnapshot(r.snapshotPath, copyState); err != nil {
-		return nil, false, err
-	}
 	return append(json.RawMessage(nil), response...), false, nil
+}
+
+func (r *Repository) rollbackLog(offset int64) {
+	if truncErr := r.logFile.Truncate(offset); truncErr == nil {
+		_ = r.logFile.Sync()
+	}
 }

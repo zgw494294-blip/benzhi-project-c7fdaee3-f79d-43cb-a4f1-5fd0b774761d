@@ -33,4 +33,13 @@ func cloneMap(values map[string]*domain.Aggregate) (map[string]*domain.Aggregate
 	return result, nil
 }
 
+func cloneIdempotency(values map[string]IdempotencyRecord) map[string]IdempotencyRecord {
+	result := make(map[string]IdempotencyRecord, len(values))
+	for key, value := range values {
+		value.Response = append(json.RawMessage(nil), value.Response...)
+		result[key] = value
+	}
+	return result
+}
+
 func idempotencyIndex(packageID, key string) string { return packageID + "\x00" + key }
