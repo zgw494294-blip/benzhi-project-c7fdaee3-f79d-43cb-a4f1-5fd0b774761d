@@ -124,7 +124,7 @@ func (s *Service) ListReviewQueue() ([]PackageSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := values[:0]
+	result := make([]PackageSummary, 0, len(values))
 	for _, value := range values {
 		if value.Status == domain.StatusReviewPending {
 			result = append(result, value)
