@@ -19,7 +19,9 @@ type Repository struct {
 	directory    string
 	logPath      string
 	snapshotPath string
+	lockPath     string
 	logFile      *os.File
+	lockFile     *os.File
 	state        snapshot
 }
 
@@ -30,14 +32,21 @@ func Open(directory string) (*Repository, error) {
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return nil, err
 	}
-	r := &Repository{directory: directory, logPath: filepath.Join(directory, "events.bin"), snapshotPath: filepath.Join(directory, "snapshot.json")}
+	r := &Repository{directory: directory, logPath: filepath.Join(directory, "events.bin"), snapshotPath: filepath.Join(directory, "snapshot.json"), lockPath: filepath.Join(directory, ".lock")}
+	lockFile, err := acquireLock(r.lockPath)
+	if err != nil {
+		return nil, err
+	}
+	r.lockFile = lockFile
 	file, err := os.OpenFile(r.logPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
+		lockFile.Close()
 		return nil, err
 	}
 	r.logFile = file
 	if err := r.restore(); err != nil {
 		file.Close()
+		lockFile.Close()
 		return nil, err
 	}
 	return r, nil
@@ -91,6 +100,12 @@ func (r *Repository) Close() error {
 	}
 	err := r.logFile.Close()
 	r.logFile = nil
+	if r.lockFile != nil {
+		if lockErr := r.lockFile.Close(); lockErr != nil && err == nil {
+			err = lockErr
+		}
+		r.lockFile = nil
+	}
 	return err
 }
 
