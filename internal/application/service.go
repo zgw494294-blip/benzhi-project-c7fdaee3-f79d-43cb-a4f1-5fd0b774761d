@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"sync"
 	"time"
 
 	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/domain"
@@ -14,10 +13,8 @@ import (
 type Clock func() time.Time
 
 type Service struct {
-	repository    *store.Repository
-	now           Clock
-	previewMu     sync.Mutex
-	previewResult manifestPreviewResult
+	repository *store.Repository
+	now        Clock
 }
 
 func NewService(repository *store.Repository) *Service {
