@@ -56,6 +56,9 @@ func writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrIntegrity):
 		status = http.StatusInternalServerError
 		body.Code = "integrity_error"
+	case errors.Is(err, domain.ErrCancelled):
+		status = 499
+		body.Code = "cancelled"
 	}
 	writeJSON(w, status, errorBody{Error: body})
 }

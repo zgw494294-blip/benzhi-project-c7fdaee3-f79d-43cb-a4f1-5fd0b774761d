@@ -12,6 +12,7 @@ var (
 	ErrVersionConflict   = errors.New("版本冲突")
 	ErrIdempotencyKey    = errors.New("幂等键已用于不同请求")
 	ErrIntegrity         = errors.New("持久化数据完整性校验失败")
+	ErrCancelled         = errors.New("请求已取消，未产生任何持久化变更")
 )
 
 type RuleError struct {

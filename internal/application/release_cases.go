@@ -32,9 +32,17 @@ func (s *Service) ApproveRelease(packageID string, command ApproveReleaseCommand
 	return s.ApproveReleaseContext(context.Background(), packageID, command)
 }
 
-func (s *Service) ApproveReleaseContext(_ context.Context, packageID string, command ApproveReleaseCommand) (PackageView, bool, error) {
+func (s *Service) ApproveReleaseContext(ctx context.Context, packageID string, command ApproveReleaseCommand) (PackageView, bool, error) {
 	return s.mutate(packageID, "approve_release", command.WriteMeta, command, RoleReleaseManager, func(aggregate *domain.Aggregate, allocate func() uint64) error {
+		// 在事件日志追加前检查请求是否已被取消；取消不得产生任何持久化变更。
+		if err := ctx.Err(); err != nil {
+			return domain.ErrCancelled
+		}
 		now := s.now().UTC()
+		// Clock 回调执行期间请求可能被取消，再次校验以拒绝跨越该边界的提交。
+		if err := ctx.Err(); err != nil {
+			return domain.ErrCancelled
+		}
 		manifest, err := audit.BuildManifest(aggregate, command.Actor, now)
 		if err != nil {
 			return err
@@ -45,12 +53,18 @@ func (s *Service) ApproveReleaseContext(_ context.Context, packageID string, com
 		if subtle.ConstantTimeCompare([]byte(command.PreviewManifestDigest), []byte(manifest.Digest)) != 1 {
 			return &domain.RuleError{Field: "previewManifestDigest", Code: "preview_expired", Message: "冻结清单预览已过期，请重新预览并确认"}
 		}
+		if err := ctx.Err(); err != nil {
+			return domain.ErrCancelled
+		}
 		if err := aggregate.SetFrozen(manifest, command.Actor, now); err != nil {
 			return err
 		}
 		credential, err := audit.IssueCredential(manifest, allocate(), command.Actor, now)
 		if err != nil {
 			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return domain.ErrCancelled
 		}
 		return aggregate.SetCredential(credential, command.Actor, now)
 	})
