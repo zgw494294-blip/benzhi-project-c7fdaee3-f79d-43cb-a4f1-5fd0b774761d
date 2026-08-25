@@ -187,7 +187,7 @@ func (r *Repository) Commit(request CommitRequest) (json.RawMessage, bool, error
 	if err != nil {
 		return nil, false, err
 	}
-	copyState := snapshot{SchemaVersion: schemaVersion, LastSequence: r.state.LastSequence, LastHash: r.state.LastHash, NextSerial: r.state.NextSerial, Packages: packages, Idempotency: r.state.Idempotency}
+	copyState := snapshot{SchemaVersion: schemaVersion, LastSequence: r.state.LastSequence, LastHash: r.state.LastHash, NextSerial: r.state.NextSerial, Packages: packages, Idempotency: snapshotIdempotency(packages, r.state.Idempotency)}
 	if err := writeSnapshot(r.snapshotPath, copyState); err != nil {
 		return nil, false, err
 	}

@@ -32,6 +32,19 @@ func readSnapshot(path string) (*snapshot, error) {
 	return &value, nil
 }
 
+func snapshotIdempotency(packages map[string]*domain.Aggregate, records map[string]IdempotencyRecord) map[string]IdempotencyRecord {
+	result := make(map[string]IdempotencyRecord, len(records))
+	for key, record := range records {
+		aggregate := packages[record.PackageID]
+		if aggregate != nil && aggregate.Package.Status.IsFrozen() {
+			continue
+		}
+		record.Response = append(json.RawMessage(nil), record.Response...)
+		result[key] = record
+	}
+	return result
+}
+
 func writeSnapshot(path string, value snapshot) error {
 	directory := filepath.Dir(path)
 	file, err := os.CreateTemp(directory, ".snapshot-*")
