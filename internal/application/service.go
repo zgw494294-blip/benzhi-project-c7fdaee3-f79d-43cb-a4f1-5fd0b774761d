@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/domain"
@@ -15,6 +16,9 @@ type Clock func() time.Time
 type Service struct {
 	repository *store.Repository
 	now        Clock
+	cacheMu    sync.Mutex
+	listCache  []PackageSummary
+	cacheValid bool
 }
 
 func NewService(repository *store.Repository) *Service {
@@ -52,6 +56,13 @@ func encodeMutationView(aggregate *domain.Aggregate, command any) (json.RawMessa
 	return json.Marshal(view)
 }
 
+func (s *Service) invalidateListCache() {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	s.listCache = nil
+	s.cacheValid = false
+}
+
 func (s *Service) mutate(packageID, action string, meta WriteMeta, command any, role string, callback func(*domain.Aggregate, func() uint64) error) (PackageView, bool, error) {
 	if err := validateMeta(meta, role); err != nil {
 		return PackageView{}, false, err
@@ -69,6 +80,7 @@ func (s *Service) mutate(packageID, action string, meta WriteMeta, command any, 
 	if err != nil {
 		return PackageView{}, false, err
 	}
+	s.invalidateListCache()
 	var view PackageView
 	if err := json.Unmarshal(response, &view); err != nil {
 		return PackageView{}, false, err
@@ -85,6 +97,11 @@ func (s *Service) GetPackage(id string) (PackageView, error) {
 }
 
 func (s *Service) ListPackages() ([]PackageSummary, error) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	if s.cacheValid {
+		return s.listCache, nil
+	}
 	values, err := s.repository.List()
 	if err != nil {
 		return nil, err
@@ -97,6 +114,8 @@ func (s *Service) ListPackages() ([]PackageSummary, error) {
 		}
 		result = append(result, summary)
 	}
+	s.listCache = result
+	s.cacheValid = true
 	return result, nil
 }
 
@@ -105,7 +124,7 @@ func (s *Service) ListReviewQueue() ([]PackageSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := make([]PackageSummary, 0)
+	result := values[:0]
 	for _, value := range values {
 		if value.Status == domain.StatusReviewPending {
 			result = append(result, value)

@@ -27,6 +27,7 @@ func (s *Service) CreatePackage(command CreatePackageCommand) (PackageView, bool
 	if err != nil {
 		return PackageView{}, false, err
 	}
+	s.invalidateListCache()
 	var view PackageView
 	if err := json.Unmarshal(response, &view); err != nil {
 		return PackageView{}, false, err
