@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>口述史公开授权工作台</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">地方文化机构 · 公开前治理</p><h1>口述史公开授权工作台</h1></div>
+    <div class="identity"><label>当前操作人<input id="actor" value="整理员甲"></label><span id="connection">本地工作台</span></div>
+  </header>
+  <main>
+    <aside class="sidebar">
+      <div class="aside-title"><h2>访谈包</h2><button id="refresh" class="quiet">刷新</button></div>
+      <label class="inline-check"><input id="review-filter" type="checkbox">只看待伦理复核</label>
+      <div id="package-list" class="package-list"><p class="muted">尚无访谈包</p></div>
+    </aside>
+    <section class="workspace">
+      <div id="notice" role="status" aria-live="polite"></div>
+      <section class="hero card">
+        <div><p class="eyebrow">唯一流程</p><h2 id="current-title">新建访谈包</h2><p id="current-meta" class="muted">从知情同意开始，直至冻结并签发凭据。</p></div>
+        <div id="status-chip" class="status">草稿</div>
+      </section>
+      <nav class="steps" aria-label="授权流程">
+        <span>01 创建</span><span>02 同意</span><span>03 标注</span><span>04 脱敏</span><span>05 复核</span><span>06 冻结</span>
+      </nav>
+      <div class="grid">
+        <section class="card form-card">
+          <h3>创建访谈包</h3>
+          <form id="create-form">
+            <label>访谈主题<input name="topic" required value="老街手工业记忆"></label>
+            <div class="cols"><label>参与者代号<input name="participantCode" required value="P-001"></label><label>资料负责人<input name="ownerName" required value="整理员甲"></label></div>
+            <label>拟公开范围<input name="intendedScope" required value="公开展示"></label>
+            <button>创建草稿</button>
+          </form>
+        </section>
+        <section class="card form-card">
+          <h3>知情同意登记</h3>
+          <form id="consent-form">
+            <label>同意条款<textarea name="terms" required>参与者确认经脱敏处理后可用于地方文化公开展示。</textarea></label>
+            <label>允许用途（每行一项）<textarea name="allowedUses" required>公开展示</textarea></label>
+            <div class="cols"><label>署名偏好<input name="attributionPreference" required value="使用参与者代号"></label><label>撤回截止点<input name="withdrawalDeadline" type="datetime-local"></label></div>
+            <button>确认同意边界</button>
+          </form>
+        </section>
+        <section class="card form-card">
+          <h3>片段录入与判定</h3>
+          <form id="segment-form"><div class="cols"><label>顺序<input name="sequence" type="number" min="1" required value="1"></label><label>片段 ID<input name="id" required value="seg-1"></label></div><label>访谈原文<textarea name="sourceText" required></textarea></label><button>添加片段</button></form>
+          <details><summary>批量录入有序片段</summary><form id="segment-batch-form"><label>每行格式：片段 ID | 顺序 | 原文<textarea name="items" required placeholder="seg-10 | 10 | 第一条访谈原文&#10;seg-20 | 20 | 第二条访谈原文"></textarea></label><button>原子提交整批片段</button></form></details>
+          <div id="classification-progress" class="metric-panel muted">录入片段后显示判定进度</div>
+          <form id="classify-form"><label>选择片段<select name="segmentID" class="segment-select"></select></label><div class="cols"><label>判定<select name="decision"><option value="public">可公开</option><option value="restricted">受限，需脱敏</option><option value="omit">不公开</option></select></label><label>风险标签（逗号分隔）<input name="riskTags" placeholder="privacy,third_party"></label></div><label>限制期限<input name="restrictionUntil" type="datetime-local"></label><button>保存判定</button><button type="button" id="complete-classification" class="secondary">全部判定完成</button></form>
+          <details><summary>批量提交尚未判定片段</summary><form id="classification-batch-form"><div id="classification-batch-list" class="batch-list muted">暂无待判定片段</div><button>提交所选判定</button></form></details>
+        </section>
+        <section class="card form-card">
+          <h3>脱敏修订与送审</h3>
+          <form id="revision-form"><label>受限片段<select name="segmentID" class="segment-select"></select></label><label>公开文本<textarea name="publicText" required></textarea></label><label>替换理由<input name="reason" required placeholder="说明隐去或泛化的原因"></label><button>提交修订</button><button type="button" id="submit-review" class="secondary">提交伦理复核</button></form>
+        </section>
+        <section class="card form-card">
+          <h3>伦理复核</h3>
+          <div id="review-progress" class="metric-panel muted">送审后显示当前轮次进度</div>
+          <form id="review-form"><label>待复核片段<select name="segmentID" class="segment-select"></select></label><div class="cols"><label>结论<select name="verdict"><option value="approved">通过</option><option value="returned">退回整改</option></select></label><label>原因<input name="reason" placeholder="退回时必填"></label></div><button>提交复核结论</button></form>
+          <details><summary>批量裁决当前轮次</summary><form id="review-batch-form"><div id="review-batch-list" class="batch-list muted">暂无待裁决片段</div><button>原子提交所选裁决</button></form></details>
+        </section>
+        <section class="card form-card">
+          <h3>冻结与授权</h3><p class="muted">开放负责人确认同意范围和全部复核结论后，冻结公开文本并签发不可变凭据。</p>
+          <button id="preview-release" class="secondary">生成只读冻结清单预览</button>
+          <div id="manifest-preview" class="manifest-preview muted">待批准时可生成预览；仅查看不会写入事件或分配凭据。</div>
+          <button id="approve-release" disabled>确认预览摘要并批准、冻结、签发</button>
+          <div id="credential" class="credential"><p>尚未签发凭据</p></div>
+        </section>
+      </div>
+      <section class="card"><div class="aside-title"><h3>公开文本与修订对照</h3><span id="segment-count" class="muted">0 个片段</span></div><div id="segments" class="segments"></div><div id="revision-history" class="revision-history muted">选择“查看修订历史”后显示不可覆盖的版本记录。</div></section>
+      <section class="card"><h3>状态时间线</h3><ol id="timeline" class="timeline"><li class="muted">创建访谈包后显示审计事件</li></ol></section>
+    </section>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
