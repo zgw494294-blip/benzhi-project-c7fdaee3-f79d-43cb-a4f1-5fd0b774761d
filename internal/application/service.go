@@ -4,8 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"sync"
 	"time"
 
+	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/audit"
 	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/domain"
 	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/store"
 )
@@ -13,19 +15,26 @@ import (
 type Clock func() time.Time
 
 type Service struct {
-	repository *store.Repository
-	now        Clock
+	repository    *store.Repository
+	now           Clock
+	timelineMu    sync.Mutex
+	timelineCache map[string]cachedTimeline
+}
+
+type cachedTimeline struct {
+	version uint64
+	items   []audit.TimelineItem
 }
 
 func NewService(repository *store.Repository) *Service {
-	return &Service{repository: repository, now: time.Now}
+	return &Service{repository: repository, now: time.Now, timelineCache: make(map[string]cachedTimeline)}
 }
 
 func NewServiceWithClock(repository *store.Repository, clock Clock) *Service {
 	if clock == nil {
 		clock = time.Now
 	}
-	return &Service{repository: repository, now: clock}
+	return &Service{repository: repository, now: clock, timelineCache: make(map[string]cachedTimeline)}
 }
 
 func requestDigest(action string, command any) (string, error) {
@@ -81,7 +90,15 @@ func (s *Service) GetPackage(id string) (PackageView, error) {
 	if err != nil {
 		return PackageView{}, err
 	}
-	return makeView(aggregate), nil
+	view := makeView(aggregate)
+	s.timelineMu.Lock()
+	if cached, ok := s.timelineCache[id]; ok && cached.version == aggregate.Package.Version {
+		view.Timeline = cached.items
+	} else {
+		s.timelineCache[id] = cachedTimeline{version: aggregate.Package.Version, items: view.Timeline}
+	}
+	s.timelineMu.Unlock()
+	return view, nil
 }
 
 func (s *Service) ListPackages() ([]PackageSummary, error) {
