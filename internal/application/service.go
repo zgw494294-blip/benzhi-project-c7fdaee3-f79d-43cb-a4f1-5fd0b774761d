@@ -12,20 +12,31 @@ import (
 
 type Clock func() time.Time
 
+type revisionCacheKey struct {
+	packageID string
+	segmentID string
+}
+
+type revisionCacheEntry struct {
+	packageVersion uint64
+	history        []domain.SegmentRevision
+}
+
 type Service struct {
-	repository *store.Repository
-	now        Clock
+	repository    *store.Repository
+	now           Clock
+	revisionCache map[revisionCacheKey]revisionCacheEntry
 }
 
 func NewService(repository *store.Repository) *Service {
-	return &Service{repository: repository, now: time.Now}
+	return &Service{repository: repository, now: time.Now, revisionCache: make(map[revisionCacheKey]revisionCacheEntry)}
 }
 
 func NewServiceWithClock(repository *store.Repository, clock Clock) *Service {
 	if clock == nil {
 		clock = time.Now
 	}
-	return &Service{repository: repository, now: clock}
+	return &Service{repository: repository, now: clock, revisionCache: make(map[revisionCacheKey]revisionCacheEntry)}
 }
 
 func requestDigest(action string, command any) (string, error) {

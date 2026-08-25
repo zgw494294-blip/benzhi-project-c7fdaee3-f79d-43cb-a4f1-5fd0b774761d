@@ -56,13 +56,30 @@ func (s *Service) RevisionHistory(packageID, segmentID string) ([]domain.Segment
 	if err != nil {
 		return nil, err
 	}
-	return aggregate.RevisionHistory(segmentID)
+	key := revisionCacheKey{packageID: packageID, segmentID: segmentID}
+	if cached, ok := s.revisionCache[key]; ok && cached.packageVersion == aggregate.Package.Version {
+		return append([]domain.SegmentRevision(nil), cached.history...), nil
+	}
+	history, err := aggregate.RevisionHistory(segmentID)
+	if err != nil {
+		return nil, err
+	}
+	s.revisionCache[key] = revisionCacheEntry{packageVersion: aggregate.Package.Version, history: append([]domain.SegmentRevision(nil), history...)}
+	return history, nil
 }
 
 func (s *Service) CompareRevisions(packageID, segmentID string, from, to uint64) (domain.RevisionComparison, error) {
 	aggregate, err := s.repository.Get(packageID)
 	if err != nil {
 		return domain.RevisionComparison{}, err
+	}
+	key := revisionCacheKey{packageID: packageID, segmentID: segmentID}
+	if cached, ok := s.revisionCache[key]; !ok || cached.packageVersion != aggregate.Package.Version {
+		history, historyErr := aggregate.RevisionHistory(segmentID)
+		if historyErr != nil {
+			return domain.RevisionComparison{}, historyErr
+		}
+		s.revisionCache[key] = revisionCacheEntry{packageVersion: aggregate.Package.Version, history: append([]domain.SegmentRevision(nil), history...)}
 	}
 	return aggregate.CompareRevisions(segmentID, from, to)
 }
