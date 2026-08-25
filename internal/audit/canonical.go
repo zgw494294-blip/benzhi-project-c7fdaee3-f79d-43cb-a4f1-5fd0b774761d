@@ -19,6 +19,21 @@ type consentCanonical struct {
 	ConfirmedBy           string   `json:"confirmedBy"`
 }
 
+type digestMemoEntry struct {
+	digest string
+}
+
+var digestMemo = make(map[string]digestMemoEntry)
+
+func lookupDigest(canonical string) (string, bool) {
+	entry, ok := digestMemo[canonical]
+	return entry.digest, ok
+}
+
+func rememberDigest(canonical, digest string) {
+	digestMemo[canonical] = digestMemoEntry{digest: digest}
+}
+
 func CanonicalConsent(consent domain.ConsentRecord) ([]byte, error) {
 	uses := append([]string(nil), consent.AllowedUses...)
 	for i := range uses {
@@ -42,7 +57,13 @@ func JSONDigest(value any) (string, error) {
 	if err := json.Compact(&compact, data); err != nil {
 		return "", err
 	}
-	return domain.StableDigest(compact.String()), nil
+	canonical := compact.String()
+	if digest, ok := lookupDigest(canonical); ok {
+		return digest, nil
+	}
+	digest := domain.StableDigest(canonical)
+	rememberDigest(canonical, digest)
+	return digest, nil
 }
 
 func normalizeTags(tags []string) []string {
