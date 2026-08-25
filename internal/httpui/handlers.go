@@ -204,7 +204,7 @@ func (s *Server) ReviewSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) PreviewReleaseHandler(w http.ResponseWriter, r *http.Request) {
-	preview, err := s.service.PreviewRelease(r.PathValue("id"))
+	preview, err := s.service.PreviewReleaseContext(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return

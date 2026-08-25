@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"crypto/subtle"
 
 	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/audit"
@@ -20,6 +21,10 @@ func (s *Service) ReviewSegments(packageID string, command ReviewSegmentsCommand
 }
 
 func (s *Service) PreviewRelease(packageID string) (audit.ManifestPreview, error) {
+	return s.PreviewReleaseContext(context.Background(), packageID)
+}
+
+func (s *Service) PreviewReleaseContext(_ context.Context, packageID string) (audit.ManifestPreview, error) {
 	aggregate, err := s.repository.Get(packageID)
 	if err != nil {
 		return audit.ManifestPreview{}, err
