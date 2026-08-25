@@ -7,6 +7,22 @@ import (
 	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/domain"
 )
 
+type manifestPreviewResult struct {
+	packageID string
+	preview   audit.ManifestPreview
+	err       error
+}
+
+func cloneManifestPreview(value audit.ManifestPreview) audit.ManifestPreview {
+	result := value
+	result.ExcludedSegmentIDs = append([]string(nil), value.ExcludedSegmentIDs...)
+	result.Segments = append([]domain.FrozenSegment(nil), value.Segments...)
+	for i := range result.Segments {
+		result.Segments[i].RiskTags = append([]string(nil), value.Segments[i].RiskTags...)
+	}
+	return result
+}
+
 func (s *Service) ReviewSegment(packageID string, command ReviewSegmentCommand) (PackageView, bool, error) {
 	return s.mutate(packageID, "review_segment", command.WriteMeta, command, RoleReviewer, func(aggregate *domain.Aggregate, _ func() uint64) error {
 		return aggregate.ReviewSegment(command.SegmentID, command.Verdict, command.Reason, command.Actor, s.now().UTC())
@@ -20,11 +36,21 @@ func (s *Service) ReviewSegments(packageID string, command ReviewSegmentsCommand
 }
 
 func (s *Service) PreviewRelease(packageID string) (audit.ManifestPreview, error) {
+	s.previewMu.Lock()
+	result := s.previewResult
+	s.previewMu.Unlock()
+	if result.packageID == packageID {
+		return cloneManifestPreview(result.preview), result.err
+	}
 	aggregate, err := s.repository.Get(packageID)
 	if err != nil {
 		return audit.ManifestPreview{}, err
 	}
-	return audit.BuildManifestPreview(aggregate, s.now().UTC())
+	preview, err := audit.BuildManifestPreview(aggregate, s.now().UTC())
+	s.previewMu.Lock()
+	s.previewResult = manifestPreviewResult{packageID: packageID, preview: cloneManifestPreview(preview), err: err}
+	s.previewMu.Unlock()
+	return preview, err
 }
 
 func (s *Service) ApproveRelease(packageID string, command ApproveReleaseCommand) (PackageView, bool, error) {
