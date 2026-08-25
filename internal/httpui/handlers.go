@@ -218,7 +218,7 @@ func (s *Server) ApproveReleaseHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	view, replayed, err := s.service.ApproveRelease(r.PathValue("id"), command)
+	view, replayed, err := s.service.ApproveReleaseContext(r.Context(), r.PathValue("id"), command)
 	s.writeMutation(w, view, replayed, err)
 }
 

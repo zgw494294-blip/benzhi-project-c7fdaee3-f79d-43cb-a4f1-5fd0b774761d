@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"crypto/subtle"
 
 	"benzhi-project-c7fdaee3-f79d-43cb-a4f1-5fd0b774761d/internal/audit"
@@ -28,6 +29,10 @@ func (s *Service) PreviewRelease(packageID string) (audit.ManifestPreview, error
 }
 
 func (s *Service) ApproveRelease(packageID string, command ApproveReleaseCommand) (PackageView, bool, error) {
+	return s.ApproveReleaseContext(context.Background(), packageID, command)
+}
+
+func (s *Service) ApproveReleaseContext(_ context.Context, packageID string, command ApproveReleaseCommand) (PackageView, bool, error) {
 	return s.mutate(packageID, "approve_release", command.WriteMeta, command, RoleReleaseManager, func(aggregate *domain.Aggregate, allocate func() uint64) error {
 		now := s.now().UTC()
 		manifest, err := audit.BuildManifest(aggregate, command.Actor, now)
